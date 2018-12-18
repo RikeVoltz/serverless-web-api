@@ -41,22 +41,22 @@ functions:
     handler: api/book.get
     events:
       - http:
-          path: book/{id}
+          path: books/{id}
           method: get
       - http:
-          path: book/ISBN/{ISBN}
+          path: books/ISBN/{ISBN}
           method: get
   bookDelete:
     handler: api/book.delete
     events:
       - http:
-          path: book/{id}
+          path: books/{id}
           method: delete
   bookUpdate:
     handler: api/book.update
     events:
       - http:
-          path: book/{id}
+          path: books/{id}
           method: put
 
 resources:

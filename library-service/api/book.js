@@ -12,7 +12,6 @@ module.exports.submit = (event, context, callback) => {
     const title = requestBody.title;
     const ISBN = requestBody.ISBN;
     const publish_date = requestBody.publish_date;
-
     if (typeof title !== 'string' || typeof ISBN !== 'string' || typeof publish_date !== 'number') {
         console.error('Validation Failed');
         callback(new Error('Couldn\'t submit book because of validation errors.'));
@@ -24,7 +23,7 @@ module.exports.submit = (event, context, callback) => {
             callback(null, {
                 statusCode: 200,
                 body: JSON.stringify({
-                    message: `Sucessfully submitted book with ISBN ${ISBN}`,
+                    message: `Ok`,
                     bookId: res.id
                 })
             });
@@ -32,9 +31,9 @@ module.exports.submit = (event, context, callback) => {
         .catch(err => {
             console.log(err);
             callback(null, {
-                statusCode: 500,
+                statusCode: 409,
                 body: JSON.stringify({
-                    message: `Unable to submit book with ISBN ${ISBN}`
+                    message: `Conflict. This book already exists`
                 })
             })
         });
@@ -72,9 +71,14 @@ module.exports.list = (event, context, callback) => {
     console.log("Scanning Book table.");
     const onScan = (err, data) => {
 
-        if (err) {
+        if (err || data.Items.length === 0) {
             console.log('Scan failed to load data. Error JSON:', JSON.stringify(err, null, 2));
-            callback(err);
+            return callback(err, {
+                statusCode: 404,
+                body: JSON.stringify({
+                    message: "Books not found"
+                })
+            });
         } else {
             console.log("Scan succeeded.");
             return callback(null, {
@@ -96,7 +100,8 @@ module.exports.get = (event, context, callback) => {
     if (event.pathParameters.id !== undefined) {
         params.Key = {id: event.pathParameters.id};
         dynamoDb.get(params).promise()
-            .then(result => {
+            .then(
+                result => {
                 const response = {
                     statusCode: 200,
                     body: JSON.stringify(result.Item),
@@ -105,8 +110,12 @@ module.exports.get = (event, context, callback) => {
             })
             .catch(error => {
                 console.error(error);
-                callback(new Error('Invalid id'));
-                return;
+                return callback(new Error('Invalid id'), {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        message: "Book not found"
+                    }),
+                });
             });
     } else if (event.pathParameters.ISBN !== undefined) {
         params.FilterExpression = "#ISBN = :ISBN";
@@ -126,8 +135,12 @@ module.exports.get = (event, context, callback) => {
             })
             .catch(error => {
                 console.error(error);
-                callback(new Error('Invalid ISBN'));
-                return;
+                return callback(new Error('Invalid ISBN'), {
+                    statusCode: 404,
+                    body: JSON.stringify({
+                        message: "Book not found"
+                    }),
+                });
             });
     } else {
         const msg = 'Bad search argument.';
@@ -147,52 +160,67 @@ module.exports.delete = (event, context, callback) => {
         .then(result => {
             const response = {
                 statusCode: 200,
-                body: JSON.stringify("Book deleted successfully"),
+                body: JSON.stringify("Ok"),
             };
             callback(null, response);
         })
         .catch(error => {
             console.error(error);
-            callback(new Error('Unable to delete book'));
-            return;
+            return callback(new Error('Invalid id'), {
+                statusCode: 404,
+                body: JSON.stringify({
+                    message: "Book not found"
+                }),
+            });
         });
 
 };
 
 module.exports.update = (event, context, callback) => {
-    let update_expression = "set ";
+    let update_expressions = [];
     let expression_attribute_values = {};
-    if (event.pathParameters.title !== undefined) {
-        update_expression += "title=:title";
-        expression_attribute_values[':title'] = event.pathParameters.title;
+    if (event.body !== null && event.body !== undefined) {
+        let body = JSON.parse(event.body);
+        if (body.title !== undefined) {
+            update_expressions.push("title=:title");
+            expression_attribute_values[':title'] = body.title;
+        }
+        if (body.ISBN !== undefined) {
+            update_expressions.push("ISBN=:ISBN");
+            expression_attribute_values[':ISBN'] = body.ISBN;
+        }
+        if (body.publish_date !== undefined) {
+            update_expressions.push("publish_date=:publish_date");
+            expression_attribute_values[':publish_date'] = body.publish_date;
+        }
     }
-    if (event.pathParameters.ISBN !== undefined) {
-        update_expression += "ISBN=:ISBN";
-        expression_attribute_values[':ISBN'] = event.pathParameters.ISBN;
-    }
-    if (event.pathParameters.publish_date !== undefined) {
-        update_expression += "publish_date=:publish_date";
-        expression_attribute_values[':publish_date'] = event.pathParameters.publish_date;
-    }
+    let update_expression = "";
+    if (update_expressions)
+        update_expression = "set " + update_expressions.join(', ');
     const params = {
         TableName: process.env.BOOK_TABLE,
         Key: {id: event.pathParameters.id},
         UpdateExpression: update_expression,
-        ExpressionAttributeValues: expression_attribute_values
+        ExpressionAttributeValues: expression_attribute_values,
+        ReturnValues: 'ALL_OLD'
     };
 
     dynamoDb.update(params).promise()
         .then(result => {
             const response = {
                 statusCode: 200,
-                body: JSON.stringify("Book updated successfully"),
+                body: JSON.stringify("Ok"),
             };
             callback(null, response);
         })
         .catch(error => {
             console.error(error);
-            callback(new Error('Unable to update book'));
-            return;
+            return callback(new Error('Invalid data'), {
+                statusCode: 404,
+                body: JSON.stringify({
+                    message: "Book not found"
+                }),
+            });
         });
 
 };
