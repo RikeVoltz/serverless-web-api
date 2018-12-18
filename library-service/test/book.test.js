@@ -6,11 +6,8 @@ let should = chai.should();
 
 
 chai.use(chaiHttp);
-//Our parent block
+
 describe('Books', () => {
-    /*
-      * Test the /GET route
-      */
     var host = 'https://ztfq39f6y7.execute-api.us-east-2.amazonaws.com';
     var path = '/dev/books';
     describe('/GET books', () => {
@@ -33,7 +30,7 @@ describe('Books', () => {
             chai.request(host)
                 .post(path)
                 .set('content-type', 'application/json')
-                .send({title: 'test', publish_date:1928, ISBN:ISBN})
+                .send({title: 'test', publish_date: 1928, ISBN: ISBN, author: 'Pushkin', amount_in_library: 5})
                 .end((err, res) => {
                     res.should.have.status(200);
                     res.body.message.should.be.a('String');
@@ -47,7 +44,7 @@ describe('Books', () => {
     describe('/GET books/{id}', () => {
         it('it should GET one book', (done) => {
             chai.request(host)
-                .get(path+'/' +new_id)
+                .get(path + '/' + new_id)
                 .end((err, res) => {
                     res.should.have.status(200);
                     res.body.should.be.a('Object');
@@ -58,11 +55,10 @@ describe('Books', () => {
     });
 
 
-
     describe('/GET books/ISBN/{ISBN}', () => {
         it('it should GET book by ISBN', (done) => {
             chai.request(host)
-                .get(path + '/ISBN/'+ISBN)
+                .get(path + '/ISBN/' + ISBN)
                 .end((err, res) => {
                     res.should.have.status(200);
                     res.body.should.be.a('Array');
@@ -75,9 +71,15 @@ describe('Books', () => {
     describe('/PUT books/{id}', () => {
         it('it should PUT one book (=change)', (done) => {
             chai.request(host)
-                .put(path + '/'+ new_id)
+                .put(path + '/' + new_id)
                 .set('content-type', 'application/json')
-                .send({title: 'not-test', publish_date:2028, ISBN:ISBN+'1'})
+                .send({
+                    title: 'not-test',
+                    publish_date: 2028,
+                    ISBN: ISBN + '1',
+                    author: 'Pushkin',
+                    amount_in_library: 5
+                })
                 .end((err, res) => {
                     res.should.have.status(200);
                     res.body.should.be.a('String');
@@ -91,7 +93,7 @@ describe('Books', () => {
     describe('/DELETE books/{id}', () => {
         it('it should DELETE one book', (done) => {
             chai.request(host)
-                .delete(path + '/'+ new_id)
+                .delete(path + '/' + new_id)
                 .end((err, res) => {
                     res.should.have.status(200);
                     res.body.should.be.a('String');

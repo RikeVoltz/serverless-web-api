@@ -11,14 +11,17 @@ module.exports.submit = (event, context, callback) => {
     const requestBody = JSON.parse(event.body);
     const title = requestBody.title;
     const ISBN = requestBody.ISBN;
+    const author = requestBody.author;
+    const amount_in_library = requestBody.amount_in_library;
     const publish_date = requestBody.publish_date;
-    if (typeof title !== 'string' || typeof ISBN !== 'string' || typeof publish_date !== 'number') {
+    if (typeof title !== 'string' || typeof ISBN !== 'string' || typeof publish_date !== 'number' ||
+        typeof author !== 'string' || typeof amount_in_library !== 'number') {
         console.error('Validation Failed');
         callback(new Error('Couldn\'t submit book because of validation errors.'));
         return;
     }
 
-    submitBookP(bookInfo(title, ISBN, publish_date))
+    submitBookP(bookInfo(title, ISBN, publish_date, author, amount_in_library))
         .then(res => {
             callback(null, {
                 statusCode: 200,
@@ -50,11 +53,13 @@ const submitBookP = book => {
         .then(res => book);
 };
 
-const bookInfo = (title, ISBN, publish_date) => {
+const bookInfo = (title, ISBN, publish_date, author, amount_in_library) => {
     const timestamp = new Date().getTime();
     return {
         id: uuid.v1(),
         title: title,
+        author: author,
+        amount_in_library: amount_in_library,
         ISBN: ISBN,
         publish_date: publish_date,
         submittedAt: timestamp,
@@ -63,9 +68,9 @@ const bookInfo = (title, ISBN, publish_date) => {
 };
 
 module.exports.list = (event, context, callback) => {
-    var params = {
+    let params = {
         TableName: process.env.BOOK_TABLE,
-        ProjectionExpression: "id, title, ISBN, publish_date"
+        ProjectionExpression: "id, title, author, amount_in_library, ISBN, publish_date"
     };
 
     console.log("Scanning Book table.");
@@ -102,12 +107,12 @@ module.exports.get = (event, context, callback) => {
         dynamoDb.get(params).promise()
             .then(
                 result => {
-                const response = {
-                    statusCode: 200,
-                    body: JSON.stringify(result.Item),
-                };
-                callback(null, response);
-            })
+                    const response = {
+                        statusCode: 200,
+                        body: JSON.stringify(result.Item),
+                    };
+                    callback(null, response);
+                })
             .catch(error => {
                 console.error(error);
                 return callback(new Error('Invalid id'), {
@@ -184,6 +189,14 @@ module.exports.update = (event, context, callback) => {
         if (body.title !== undefined) {
             update_expressions.push("title=:title");
             expression_attribute_values[':title'] = body.title;
+        }
+        if (body.author !== undefined) {
+            update_expressions.push("author=:author");
+            expression_attribute_values[':author'] = body.author;
+        }
+        if (body.amount_in_library !== undefined) {
+            update_expressions.push("amount_in_library=:amount_in_library");
+            expression_attribute_values[':amount_in_library'] = body.amount_in_library;
         }
         if (body.ISBN !== undefined) {
             update_expressions.push("ISBN=:ISBN");
